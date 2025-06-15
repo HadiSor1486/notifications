@@ -36,7 +36,7 @@ messaging.onBackgroundMessage(function(payload) {
                 title: 'Open Website'
             },
             {
-                action: 'close',
+                action: 'close', 
                 title: 'Close'
             }
         ],
@@ -49,16 +49,14 @@ messaging.onBackgroundMessage(function(payload) {
 // Handle notification clicks
 self.addEventListener('notificationclick', function(event) {
     console.log('[Service Worker] Notification click received.');
-
     event.notification.close();
 
     if (event.action === 'open' || !event.action) {
-        // Open the website
         event.waitUntil(
             clients.matchAll({type: 'window'}).then(function(clientList) {
                 for (var i = 0; i < clientList.length; i++) {
                     var client = clientList[i];
-                    if (client.url.includes(location.origin) && 'focus' in client) {
+                    if (client.url.includes(self.location.origin) && 'focus' in client) {
                         return client.focus();
                     }
                 }
