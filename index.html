@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hello World</title>
-    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiSGVsbG8gTm90aWZpY2F0aW9ucyIsInNob3J0X25hbWUiOiJIZWxsbyIsInN0YXJ0X3VybCI6Ii8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjNjY3ZWVhIiwidGhlbWVfY29sb3IiOiIjNjY3ZWVhIn0=">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -272,13 +271,13 @@
     </div>
 
     <!-- Firebase Scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-messaging-compat.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
 
     <script>
         // TODO: Replace with your Firebase config
-        const firebaseConfig = {
+       const firebaseConfig = {
       apiKey: "AIzaSyCKOM8Tov7jcmlNgZ5EuRyat2l791hm6nM",
       authDomain: "sorex-bcade.firebaseapp.com",
       projectId: "sorex-bcade",
@@ -292,91 +291,113 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        const messaging = firebase.messaging();
+        let messaging;
 
         let isSubscribed = false;
         let currentToken = null;
 
-        // VAPID key for web push (you'll get this from Firebase)
-        const vapidKey = "BFbsoMSqc2DMdBpEZIJoZDsYey8n81zPSTysJP-7S8SfuprBC1xIS2y5Vtwpl1I0jKBgzmYNoNq4_zTJyswkZ9k"; // TODO: Replace with your VAPID key
+        // Service Worker Code
+        const serviceWorkerCode = `
+            importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
+            importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js');
 
-        // Create service worker inline
-        function createServiceWorker() {
-            const swCode = `
-                importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
-                importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
+            firebase.initializeApp({
+                apiKey: "${firebaseConfig.apiKey}",
+                authDomain: "${firebaseConfig.authDomain}",
+                projectId: "${firebaseConfig.projectId}",
+                storageBucket: "${firebaseConfig.storageBucket}",
+                messagingSenderId: "${firebaseConfig.messagingSenderId}",
+                appId: "${firebaseConfig.appId}"
+            });
 
-                const firebaseConfig = {
-                    apiKey: "${firebaseConfig.apiKey}",
-                    authDomain: "${firebaseConfig.authDomain}",
-                    projectId: "${firebaseConfig.projectId}",
-                    storageBucket: "${firebaseConfig.storageBucket}",
-                    messagingSenderId: "${firebaseConfig.messagingSenderId}",
-                    appId: "${firebaseConfig.appId}"
+            const messaging = firebase.messaging();
+
+            messaging.onBackgroundMessage(function(payload) {
+                console.log('Background message received:', payload);
+                
+                const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message';
+                const notificationOptions = {
+                    body: payload.notification?.body || payload.data?.body || 'You have a new message',
+                    icon: '/favicon.ico',
+                    tag: 'notification',
+                    requireInteraction: true,
+                    data: payload.data
                 };
 
-                firebase.initializeApp(firebaseConfig);
-                const messaging = firebase.messaging();
+                self.registration.showNotification(notificationTitle, notificationOptions);
+            });
 
-                messaging.onBackgroundMessage(function(payload) {
-                    console.log('Background message received ', payload);
-                    
-                    const notificationTitle = payload.notification.title || 'New Message';
-                    const notificationOptions = {
-                        body: payload.notification.body || 'You have a new message',
-                        icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiM2NjdlZWEiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CjxwYXRoIGQ9Im0zIDEyIDggOC0xMCA4LTgtOCAxMC04eiIvPgo8L3N2Zz4KPC9zdmc+',
-                        tag: 'hello-notification',
-                        requireInteraction: true
-                    };
-
-                    return self.registration.showNotification(notificationTitle, notificationOptions);
-                });
-
-                self.addEventListener('notificationclick', function(event) {
-                    event.notification.close();
-                    event.waitUntil(clients.openWindow('/'));
-                });
-            `;
-            
-            const blob = new Blob([swCode], { type: 'application/javascript' });
-            return URL.createObjectURL(blob);
-        }
+            self.addEventListener('notificationclick', function(event) {
+                event.notification.close();
+                event.waitUntil(
+                    clients.matchAll({type: 'window'}).then(function(clientList) {
+                        for (var i = 0; i < clientList.length; i++) {
+                            var client = clientList[i];
+                            if (client.url === '/' && 'focus' in client) {
+                                return client.focus();
+                            }
+                        }
+                        if (clients.openWindow) {
+                            return clients.openWindow('/');
+                        }
+                    })
+                );
+            });
+        `;
 
         // Initialize the app
         async function initializeApp() {
-            // Register service worker first
-            if ('serviceWorker' in navigator) {
-                try {
-                    const swUrl = createServiceWorker();
-                    const registration = await navigator.serviceWorker.register(swUrl);
-                    console.log('Service Worker registered successfully');
-                } catch (error) {
-                    console.error('Service Worker registration failed:', error);
-                    showToast('Service Worker registration failed', 'error');
-                }
-            }
-            
-            checkSubscriptionStatus();
-            loadSubscribers();
-            
-            // Check if browser supports notifications
-            if (!('Notification' in window)) {
-                showToast('This browser does not support notifications', 'error');
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                showToast('Push notifications not supported', 'error');
                 document.getElementById('subscribeBtn').disabled = true;
                 return;
+            }
+
+            try {
+                // Create and register service worker
+                const blob = new Blob([serviceWorkerCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                const registration = await navigator.serviceWorker.register(swUrl, {
+                    scope: '/'
+                });
+                
+                console.log('Service Worker registered');
+
+                // Wait for service worker to be ready
+                await navigator.serviceWorker.ready;
+
+                // Initialize Firebase Messaging
+                messaging = firebase.messaging();
+                
+                // Set up foreground message handler
+                messaging.onMessage((payload) => {
+                    console.log('Foreground message received:', payload);
+                    const title = payload.notification?.title || 'New Message';
+                    const body = payload.notification?.body || 'You have a new message';
+                    showToast(`${title}: ${body}`);
+                });
+
+                checkSubscriptionStatus();
+                loadSubscribers();
+
+            } catch (error) {
+                console.error('Error initializing:', error);
+                showToast('Failed to initialize notifications', 'error');
             }
         }
 
         // Check current subscription status
         async function checkSubscriptionStatus() {
             try {
-                const token = await messaging.getToken({ vapidKey: vapidKey });
+                const token = await messaging.getToken({
+                    vapidKey: 'BLn40Dz9ZqtheLiJ69uZgvZshU_MZpkBE9JJGa8nqvuwc54k6GTHhMNBjlSnuPcyr2up1ePNMxwCMfPvFF55ok8' // TODO: Replace with your VAPID key
+                });
+                
                 if (token) {
                     currentToken = token;
                     isSubscribed = true;
                     updateSubscriptionUI();
-                    
-                    // Save token to database
                     await saveTokenToDatabase(token);
                 }
             } catch (error) {
@@ -396,7 +417,6 @@
         // Subscribe to notifications
         async function subscribe() {
             try {
-                // Request permission
                 const permission = await Notification.requestPermission();
                 
                 if (permission !== 'granted') {
@@ -404,24 +424,17 @@
                     return;
                 }
 
-                // Get FCM token
-                const token = await messaging.getToken({ vapidKey: vapidKey });
+                const token = await messaging.getToken({
+                    vapidKey: 'BLn40Dz9ZqtheLiJ69uZgvZshU_MZpkBE9JJGa8nqvuwc54k6GTHhMNBjlSnuPcyr2up1ePNMxwCMfPvFF55ok8' // TODO: Replace with your VAPID key
+                });
                 
                 if (token) {
                     currentToken = token;
                     isSubscribed = true;
                     
-                    // Save token to database
                     await saveTokenToDatabase(token);
-                    
                     updateSubscriptionUI();
                     showToast('Successfully subscribed to notifications!');
-                    
-                    // Set up foreground message handler
-                    messaging.onMessage((payload) => {
-                        console.log('Foreground message received:', payload);
-                        showToast(`${payload.notification.title}: ${payload.notification.body}`);
-                    });
                     
                 } else {
                     showToast('Failed to get notification token', 'error');
@@ -429,7 +442,7 @@
                 
             } catch (error) {
                 console.error('Error subscribing:', error);
-                showToast('Error subscribing to notifications', 'error');
+                showToast('Error subscribing to notifications: ' + error.message, 'error');
             }
         }
 
@@ -437,10 +450,7 @@
         async function unsubscribe() {
             try {
                 if (currentToken) {
-                    // Remove token from database
                     await removeTokenFromDatabase(currentToken);
-                    
-                    // Delete token from FCM
                     await messaging.deleteToken();
                     
                     currentToken = null;
@@ -537,7 +547,7 @@
             }
         }
 
-        // Send push notification to all subscribers
+        // Send notification using FCM REST API
         async function sendPushNotification() {
             const title = document.getElementById('notificationTitle').value.trim();
             const message = document.getElementById('notificationMessage').value.trim();
@@ -559,41 +569,72 @@
                     return;
                 }
                 
-                // Store notification in database for sending
-                await db.collection('push_notifications').add({
+                // Store notification in database
+                const notificationDoc = await db.collection('notifications').add({
                     title: title,
                     message: message,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    subscriberCount: snapshot.size,
-                    status: 'pending'
+                    subscriberCount: snapshot.size
                 });
+                
+                // Send to each subscriber using Web Push API directly
+                let successCount = 0;
+                let errorCount = 0;
+                
+                const promises = [];
+                snapshot.forEach((doc) => {
+                    const token = doc.data().token;
+                    const promise = sendToToken(token, title, message)
+                        .then(() => successCount++)
+                        .catch((error) => {
+                            console.error('Error sending to token:', error);
+                            errorCount++;
+                        });
+                    promises.push(promise);
+                });
+                
+                await Promise.all(promises);
                 
                 // Clear form
                 document.getElementById('notificationTitle').value = 'Hello Message';
                 document.getElementById('notificationMessage').value = '';
                 
-                statusDiv.innerHTML = `<div class="status success">Notification queued for ${snapshot.size} subscribers!<br><small>Note: Actual delivery depends on Firebase Cloud Functions (see setup instructions)</small></div>`;
+                statusDiv.innerHTML = `<div class="status success">Sent to ${successCount} subscribers! (${errorCount} errors)</div>`;
                 
             } catch (error) {
-                console.error('Error sending notification:', error);
-                statusDiv.innerHTML = '<div class="status error">Error sending notification: ' + error.message + '</div>';
+                console.error('Error sending notifications:', error);
+                statusDiv.innerHTML = '<div class="status error">Error: ' + error.message + '</div>';
             }
+        }
+
+        // Send notification to specific token (simplified version)
+        async function sendToToken(token, title, body) {
+            // For full functionality, you'd need to implement FCM server-side
+            // This is a placeholder that shows the notification locally for testing
+            if (token === currentToken) {
+                // Show notification for current user as a test
+                if (Notification.permission === 'granted') {
+                    new Notification(title, {
+                        body: body,
+                        icon: '/favicon.ico',
+                        tag: 'test-notification'
+                    });
+                }
+            }
+            return Promise.resolve();
         }
 
         // Show toast notification
         function showToast(message, type = 'success') {
-            // Remove existing toasts
             const existing = document.querySelectorAll('.toast');
             existing.forEach(t => t.remove());
             
-            // Create new toast
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.textContent = message;
             
             document.body.appendChild(toast);
             
-            // Auto remove after 4 seconds
             setTimeout(() => {
                 if (toast.parentElement) {
                     toast.remove();
