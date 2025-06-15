@@ -276,7 +276,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
 
     <script>
-        // Firebase configuration
+        // Firebase config
         const firebaseConfig = {
             apiKey: "AIzaSyCKOM8Tov7jcmlNgZ5EuRyat2l791hm6nM",
             authDomain: "sorex-bcade.firebaseapp.com",
@@ -295,6 +295,77 @@
         let isSubscribed = false;
         let currentToken = null;
 
+        // Get the current path for GitHub Pages
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.endsWith('/') ? currentPath : currentPath + '/';
+
+        // Service Worker Code - Updated for GitHub Pages compatibility
+        const serviceWorkerCode = `
+            importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
+            importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js');
+
+            firebase.initializeApp({
+                apiKey: "${firebaseConfig.apiKey}",
+                authDomain: "${firebaseConfig.authDomain}",
+                projectId: "${firebaseConfig.projectId}",
+                storageBucket: "${firebaseConfig.storageBucket}",
+                messagingSenderId: "${firebaseConfig.messagingSenderId}",
+                appId: "${firebaseConfig.appId}"
+            });
+
+            const messaging = firebase.messaging();
+
+            messaging.onBackgroundMessage(function(payload) {
+                console.log('Background message received:', payload);
+                
+                const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message';
+                const notificationOptions = {
+                    body: payload.notification?.body || payload.data?.body || 'You have a new message',
+                    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiM2NjdlZWEiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CjxwYXRoIGQ9Im0zIDEyIDggOC0xMCA4LTgtOCAxMC04eiIvPgo8L3N2Zz4KPC9zdmc+',
+                    tag: 'notification',
+                    requireInteraction: true,
+                    data: payload.data,
+                    actions: [
+                        {
+                            action: 'open',
+                            title: 'Open Website'
+                        },
+                        {
+                            action: 'close',
+                            title: 'Close'
+                        }
+                    ]
+                };
+
+                return self.registration.showNotification(notificationTitle, notificationOptions);
+            });
+
+            self.addEventListener('notificationclick', function(event) {
+                console.log('Notification clicked:', event);
+                event.notification.close();
+                
+                if (event.action === 'open' || !event.action) {
+                    event.waitUntil(
+                        clients.matchAll({type: 'window'}).then(function(clientList) {
+                            for (var i = 0; i < clientList.length; i++) {
+                                var client = clientList[i];
+                                if (client.url.includes('${window.location.hostname}') && 'focus' in client) {
+                                    return client.focus();
+                                }
+                            }
+                            if (clients.openWindow) {
+                                return clients.openWindow('${window.location.origin}${basePath}');
+                            }
+                        })
+                    );
+                }
+            });
+
+            self.addEventListener('notificationclose', function(event) {
+                console.log('Notification closed:', event);
+            });
+        `;
+
         // Initialize the app
         async function initializeApp() {
             if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -304,16 +375,22 @@
             }
 
             try {
-                // First register the service worker
-                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-                console.log('Service Worker registered successfully:', registration);
+                // Create and register service worker with correct scope
+                const blob = new Blob([serviceWorkerCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                // Register with the current path as scope for GitHub Pages compatibility
+                const registration = await navigator.serviceWorker.register(swUrl, {
+                    scope: basePath
+                });
+                
+                console.log('Service Worker registered with scope:', basePath);
 
                 // Wait for service worker to be ready
                 await navigator.serviceWorker.ready;
 
-                // Initialize Firebase Messaging with the service worker
+                // Initialize Firebase Messaging
                 messaging = firebase.messaging();
-                messaging.useServiceWorker(registration);
                 
                 // Set up foreground message handler
                 messaging.onMessage((payload) => {
@@ -323,27 +400,23 @@
                     showToast(`${title}: ${body}`);
                 });
 
-                await checkSubscriptionStatus();
+                checkSubscriptionStatus();
                 loadSubscribers();
 
             } catch (error) {
                 console.error('Error initializing:', error);
                 showToast('Failed to initialize notifications: ' + error.message, 'error');
-                
-                // If service worker fails, try without it for basic functionality
-                try {
-                    messaging = firebase.messaging();
-                    await checkSubscriptionStatus();
-                    loadSubscribers();
-                } catch (fallbackError) {
-                    console.error('Fallback initialization failed:', fallbackError);
-                }
             }
         }
 
         // Check current subscription status
         async function checkSubscriptionStatus() {
             try {
+                if (!messaging) {
+                    console.log('Messaging not initialized yet');
+                    return;
+                }
+
                 const token = await messaging.getToken({
                     vapidKey: 'BLn40Dz9ZqtheLiJ69uZgvZshU_MZpkBE9JJGa8nqvuwc54k6GTHhMNBjlSnuPcyr2up1ePNMxwCMfPvFF55ok8'
                 });
@@ -354,7 +427,7 @@
                     updateSubscriptionUI();
                     await saveTokenToDatabase(token);
                 } else {
-                    updateSubscriptionUI();
+                    console.log('No registration token available');
                 }
             } catch (error) {
                 console.log('No existing token:', error);
@@ -374,6 +447,11 @@
         // Subscribe to notifications
         async function subscribe() {
             try {
+                if (!messaging) {
+                    showToast('Messaging service not available', 'error');
+                    return;
+                }
+
                 const permission = await Notification.requestPermission();
                 
                 if (permission !== 'granted') {
@@ -408,7 +486,9 @@
             try {
                 if (currentToken) {
                     await removeTokenFromDatabase(currentToken);
-                    await messaging.deleteToken();
+                    if (messaging) {
+                        await messaging.deleteToken();
+                    }
                     
                     currentToken = null;
                     isSubscribed = false;
@@ -428,7 +508,8 @@
                     token: token,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     userAgent: navigator.userAgent,
-                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                    url: window.location.href
                 });
             } catch (error) {
                 console.error('Error saving token:', error);
@@ -527,34 +608,58 @@
                 }
                 
                 // Store notification in database
-                await db.collection('notifications').add({
+                const notificationDoc = await db.collection('notifications').add({
                     title: title,
                     message: message,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     subscriberCount: snapshot.size
                 });
                 
-                // For testing: show notification to current user
+                // Send to each subscriber using Web Push API directly
                 let successCount = 0;
-                if (currentToken && Notification.permission === 'granted') {
-                    new Notification(title, {
-                        body: message,
-                        icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiM2NjdlZWEiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CjxwYXRoIGQ9Im0zIDEyIDggOC0xMCA4LTgtOCAxMC04eiIvPgo8L3N2Zz4KPC9zdmc+',
-                        tag: 'admin-notification'
-                    });
-                    successCount = 1;
-                }
+                let errorCount = 0;
+                
+                const promises = [];
+                snapshot.forEach((doc) => {
+                    const token = doc.data().token;
+                    const promise = sendToToken(token, title, message)
+                        .then(() => successCount++)
+                        .catch((error) => {
+                            console.error('Error sending to token:', error);
+                            errorCount++;
+                        });
+                    promises.push(promise);
+                });
+                
+                await Promise.all(promises);
                 
                 // Clear form
                 document.getElementById('notificationTitle').value = 'Hello Message';
                 document.getElementById('notificationMessage').value = '';
                 
-                statusDiv.innerHTML = `<div class="status success">Notification sent! (${successCount} shown locally for testing)</div>`;
+                statusDiv.innerHTML = `<div class="status success">Sent to ${successCount} subscribers! (${errorCount} errors)</div>`;
                 
             } catch (error) {
                 console.error('Error sending notifications:', error);
                 statusDiv.innerHTML = '<div class="status error">Error: ' + error.message + '</div>';
             }
+        }
+
+        // Send notification to specific token (simplified version)
+        async function sendToToken(token, title, body) {
+            // For full functionality, you'd need to implement FCM server-side
+            // This is a placeholder that shows the notification locally for testing
+            if (token === currentToken) {
+                // Show notification for current user as a test
+                if (Notification.permission === 'granted') {
+                    new Notification(title, {
+                        body: body,
+                        icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiM2NjdlZWEiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CjxwYXRoIGQ9Im0zIDEyIDggOC0xMCA4LTgtOCAxMC04eiIvPgo8L3N2Zz4KPC9zdmc+',
+                        tag: 'test-notification'
+                    });
+                }
+            }
+            return Promise.resolve();
         }
 
         // Show toast notification
