@@ -276,17 +276,16 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
 
     <script>
-        // TODO: Replace with your Firebase config
-       const firebaseConfig = {
-      apiKey: "AIzaSyCKOM8Tov7jcmlNgZ5EuRyat2l791hm6nM",
-      authDomain: "sorex-bcade.firebaseapp.com",
-      projectId: "sorex-bcade",
-      storageBucket: "sorex-bcade.appspot.com",
-      messagingSenderId: "428693429265",
-      appId: "1:428693429265:web:b38ab9c0f26a026cc8e5b0",
-      measurementId: "G-QCWT0DSEL6"
-    };
-
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCKOM8Tov7jcmlNgZ5EuRyat2l791hm6nM",
+            authDomain: "sorex-bcade.firebaseapp.com",
+            projectId: "sorex-bcade",
+            storageBucket: "sorex-bcade.appspot.com",
+            messagingSenderId: "428693429265",
+            appId: "1:428693429265:web:b38ab9c0f26a026cc8e5b0",
+            measurementId: "G-QCWT0DSEL6"
+        };
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
@@ -295,55 +294,6 @@
 
         let isSubscribed = false;
         let currentToken = null;
-
-        // Service Worker Code
-        const serviceWorkerCode = `
-            importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js');
-            importScripts('https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js');
-
-            firebase.initializeApp({
-                apiKey: "${firebaseConfig.apiKey}",
-                authDomain: "${firebaseConfig.authDomain}",
-                projectId: "${firebaseConfig.projectId}",
-                storageBucket: "${firebaseConfig.storageBucket}",
-                messagingSenderId: "${firebaseConfig.messagingSenderId}",
-                appId: "${firebaseConfig.appId}"
-            });
-
-            const messaging = firebase.messaging();
-
-            messaging.onBackgroundMessage(function(payload) {
-                console.log('Background message received:', payload);
-                
-                const notificationTitle = payload.notification?.title || payload.data?.title || 'New Message';
-                const notificationOptions = {
-                    body: payload.notification?.body || payload.data?.body || 'You have a new message',
-                    icon: '/favicon.ico',
-                    tag: 'notification',
-                    requireInteraction: true,
-                    data: payload.data
-                };
-
-                self.registration.showNotification(notificationTitle, notificationOptions);
-            });
-
-            self.addEventListener('notificationclick', function(event) {
-                event.notification.close();
-                event.waitUntil(
-                    clients.matchAll({type: 'window'}).then(function(clientList) {
-                        for (var i = 0; i < clientList.length; i++) {
-                            var client = clientList[i];
-                            if (client.url === '/' && 'focus' in client) {
-                                return client.focus();
-                            }
-                        }
-                        if (clients.openWindow) {
-                            return clients.openWindow('/');
-                        }
-                    })
-                );
-            });
-        `;
 
         // Initialize the app
         async function initializeApp() {
@@ -354,15 +304,12 @@
             }
 
             try {
-                // Create and register service worker
-                const blob = new Blob([serviceWorkerCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                
-                const registration = await navigator.serviceWorker.register(swUrl, {
+                // Register the actual service worker file
+                const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js', {
                     scope: '/'
                 });
                 
-                console.log('Service Worker registered');
+                console.log('Service Worker registered successfully');
 
                 // Wait for service worker to be ready
                 await navigator.serviceWorker.ready;
@@ -383,7 +330,7 @@
 
             } catch (error) {
                 console.error('Error initializing:', error);
-                showToast('Failed to initialize notifications', 'error');
+                showToast('Failed to initialize notifications: ' + error.message, 'error');
             }
         }
 
