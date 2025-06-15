@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World</title>
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiSGVsbG8gTm90aWZpY2F0aW9ucyIsInNob3J0X25hbWUiOiJIZWxsbyIsInN0YXJ0X3VybCI6Ii8iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjNjY3ZWVhIiwidGhlbWVfY29sb3IiOiIjNjY3ZWVhIn0=">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        .hello {
+            font-size: 3rem;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .notification-box {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            margin: 20px 0;
+        }
+        
+        .notification-box h3 {
+            margin-top: 0;
+            color: #fff;
+        }
+        
+        .notification-box p {
+            color: rgba(255,255,255,0.8);
+            line-height: 1.5;
+        }
+        
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        
+        .btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn.subscribed {
+            background: #2196F3;
+        }
+        
+        .btn.unsubscribe {
+            background: #f44336;
+        }
+        
+        .admin-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+        }
+        
+        .admin-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .admin-content {
+            background: white;
+            color: black;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .admin-content h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .admin-content textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            resize: vertical;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        
+        .admin-content input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+        
+        .admin-content button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .admin-content button:hover {
+            background: #5a67d8;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .subscribers-list {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .subscriber-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 3px;
+            border-left: 4px solid #4CAF50;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 300px;
+            z-index: 2000;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .toast.error {
+            background: #f44336;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .hello {
+                font-size: 2rem;
+            }
+            
+            .notification-box {
+                padding: 20px;
+                margin: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hello">Hello</div>
+    
+    <div class="notification-box">
+        <h3>🔔 Get Notifications</h3>
+        <p>Want to receive messages from this site even when you're not here? Subscribe to push notifications!</p>
+        <button id="subscribeBtn" class="btn" onclick="toggleSubscription()">
+            Enable Notifications
+        </button>
+        <div id="subscriptionStatus"></div>
+    </div>
+    
+    <button class="admin-toggle" onclick="toggleAdmin()">Admin</button>
+    
+    <div class="admin-panel" id="adminPanel">
+        <div class="admin-content">
+            <h2>📢 Admin Panel</h2>
+            
+            <div>
+                <h3>Send Push Notification</h3>
+                <input type="text" id="notificationTitle" placeholder="Notification Title" value="Hello Message">
+                <textarea id="notificationMessage" placeholder="Type your message here..."></textarea>
+                <button onclick="sendPushNotification()">Send to All Subscribers</button>
+            </div>
+            
+            <div id="adminStatus"></div>
+            
+            <div class="subscribers-list">
+                <h3>📱 Active Subscribers</h3>
+                <div id="subscribersList">Loading...</div>
+            </div>
+            
+            <button onclick="toggleAdmin()">Close</button>
+        </div>
+    </div>
+
+    <!-- Firebase Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-firestore-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-messaging-compat.min.js"></script>
+
+    <script>
+        // TODO: Replace with your Firebase config
+        const firebaseConfig = {
+      apiKey: "AIzaSyCKOM8Tov7jcmlNgZ5EuRyat2l791hm6nM",
+      authDomain: "sorex-bcade.firebaseapp.com",
+      projectId: "sorex-bcade",
+      storageBucket: "sorex-bcade.appspot.com",
+      messagingSenderId: "428693429265",
+      appId: "1:428693429265:web:b38ab9c0f26a026cc8e5b0",
+      measurementId: "G-QCWT0DSEL6"
+    };
+
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const messaging = firebase.messaging();
+
+        let isSubscribed = false;
+        let currentToken = null;
+
+        // VAPID key for web push (you'll get this from Firebase)
+        const vapidKey = "BFbsoMSqc2DMdBpEZIJoZDsYey8n81zPSTysJP-7S8SfuprBC1xIS2y5Vtwpl1I0jKBgzmYNoNq4_zTJyswkZ9k"; // TODO: Replace with your VAPID key
+
+        // Initialize the app
+        async function initializeApp() {
+            checkSubscriptionStatus();
+            loadSubscribers();
+            
+            // Check if browser supports notifications
+            if (!('Notification' in window)) {
+                showToast('This browser does not support notifications', 'error');
+                document.getElementById('subscribeBtn').disabled = true;
+                return;
+            }
+        }
+
+        // Check current subscription status
+        async function checkSubscriptionStatus() {
+            try {
+                const token = await messaging.getToken({ vapidKey: vapidKey });
+                if (token) {
+                    currentToken = token;
+                    isSubscribed = true;
+                    updateSubscriptionUI();
+                    
+                    // Save token to database
+                    await saveTokenToDatabase(token);
+                }
+            } catch (error) {
+                console.log('No existing token:', error);
+            }
+        }
+
+        // Toggle subscription
+        async function toggleSubscription() {
+            if (isSubscribed) {
+                await unsubscribe();
+            } else {
+                await subscribe();
+            }
+        }
+
+        // Subscribe to notifications
+        async function subscribe() {
+            try {
+                // Request permission
+                const permission = await Notification.requestPermission();
+                
+                if (permission !== 'granted') {
+                    showToast('Notification permission denied', 'error');
+                    return;
+                }
+
+                // Get FCM token
+                const token = await messaging.getToken({ vapidKey: vapidKey });
+                
+                if (token) {
+                    currentToken = token;
+                    isSubscribed = true;
+                    
+                    // Save token to database
+                    await saveTokenToDatabase(token);
+                    
+                    updateSubscriptionUI();
+                    showToast('Successfully subscribed to notifications!');
+                    
+                    // Set up foreground message handler
+                    messaging.onMessage((payload) => {
+                        console.log('Foreground message received:', payload);
+                        showToast(`${payload.notification.title}: ${payload.notification.body}`);
+                    });
+                    
+                } else {
+                    showToast('Failed to get notification token', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error subscribing:', error);
+                showToast('Error subscribing to notifications', 'error');
+            }
+        }
+
+        // Unsubscribe from notifications
+        async function unsubscribe() {
+            try {
+                if (currentToken) {
+                    // Remove token from database
+                    await removeTokenFromDatabase(currentToken);
+                    
+                    // Delete token from FCM
+                    await messaging.deleteToken();
+                    
+                    currentToken = null;
+                    isSubscribed = false;
+                    updateSubscriptionUI();
+                    showToast('Unsubscribed from notifications');
+                }
+            } catch (error) {
+                console.error('Error unsubscribing:', error);
+                showToast('Error unsubscribing', 'error');
+            }
+        }
+
+        // Save token to database
+        async function saveTokenToDatabase(token) {
+            try {
+                await db.collection('subscribers').doc(token).set({
+                    token: token,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    userAgent: navigator.userAgent,
+                    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (error) {
+                console.error('Error saving token:', error);
+            }
+        }
+
+        // Remove token from database
+        async function removeTokenFromDatabase(token) {
+            try {
+                await db.collection('subscribers').doc(token).delete();
+            } catch (error) {
+                console.error('Error removing token:', error);
+            }
+        }
+
+        // Update subscription UI
+        function updateSubscriptionUI() {
+            const btn = document.getElementById('subscribeBtn');
+            const status = document.getElementById('subscriptionStatus');
+            
+            if (isSubscribed) {
+                btn.textContent = 'Disable Notifications';
+                btn.className = 'btn unsubscribe';
+                status.innerHTML = '<div class="status success">✅ You are subscribed to notifications</div>';
+            } else {
+                btn.textContent = 'Enable Notifications';
+                btn.className = 'btn';
+                status.innerHTML = '<div class="status error">❌ You are not subscribed</div>';
+            }
+        }
+
+        // Admin functions
+        function toggleAdmin() {
+            const panel = document.getElementById('adminPanel');
+            const isVisible = panel.style.display === 'flex';
+            panel.style.display = isVisible ? 'none' : 'flex';
+            
+            if (!isVisible) {
+                loadSubscribers();
+            }
+        }
+
+        // Load subscribers list
+        async function loadSubscribers() {
+            try {
+                const snapshot = await db.collection('subscribers').get();
+                const subscribersList = document.getElementById('subscribersList');
+                
+                if (snapshot.empty) {
+                    subscribersList.innerHTML = '<p>No subscribers yet</p>';
+                    return;
+                }
+                
+                let html = `<p><strong>${snapshot.size} total subscribers</strong></p>`;
+                
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const shortToken = data.token.substring(0, 20) + '...';
+                    const timestamp = data.timestamp ? data.timestamp.toDate().toLocaleString() : 'Unknown';
+                    
+                    html += `
+                        <div class="subscriber-item">
+                            <strong>Token:</strong> ${shortToken}<br>
+                            <strong>Subscribed:</strong> ${timestamp}
+                        </div>
+                    `;
+                });
+                
+                subscribersList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading subscribers:', error);
+                document.getElementById('subscribersList').innerHTML = '<p>Error loading subscribers</p>';
+            }
+        }
+
+        // Send push notification to all subscribers
+        async function sendPushNotification() {
+            const title = document.getElementById('notificationTitle').value.trim();
+            const message = document.getElementById('notificationMessage').value.trim();
+            const statusDiv = document.getElementById('adminStatus');
+            
+            if (!title || !message) {
+                statusDiv.innerHTML = '<div class="status error">Please fill in both title and message</div>';
+                return;
+            }
+            
+            try {
+                statusDiv.innerHTML = '<div class="status">Sending notifications...</div>';
+                
+                // Get all subscriber tokens
+                const snapshot = await db.collection('subscribers').get();
+                
+                if (snapshot.empty) {
+                    statusDiv.innerHTML = '<div class="status error">No subscribers found</div>';
+                    return;
+                }
+                
+                // Store notification in database for sending
+                await db.collection('push_notifications').add({
+                    title: title,
+                    message: message,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    subscriberCount: snapshot.size,
+                    status: 'pending'
+                });
+                
+                // Clear form
+                document.getElementById('notificationTitle').value = 'Hello Message';
+                document.getElementById('notificationMessage').value = '';
+                
+                statusDiv.innerHTML = `<div class="status success">Notification queued for ${snapshot.size} subscribers!<br><small>Note: Actual delivery depends on Firebase Cloud Functions (see setup instructions)</small></div>`;
+                
+            } catch (error) {
+                console.error('Error sending notification:', error);
+                statusDiv.innerHTML = '<div class="status error">Error sending notification: ' + error.message + '</div>';
+            }
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            // Remove existing toasts
+            const existing = document.querySelectorAll('.toast');
+            existing.forEach(t => t.remove());
+            
+            // Create new toast
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            // Auto remove after 4 seconds
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 4000);
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', initializeApp);
+    </script>
+</body>
+</html>
