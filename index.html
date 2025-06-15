@@ -304,18 +304,16 @@
             }
 
             try {
-                // Register the actual service worker file
-                const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js', {
-                    scope: '/'
-                });
-                
-                console.log('Service Worker registered successfully');
+                // First register the service worker
+                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                console.log('Service Worker registered successfully:', registration);
 
                 // Wait for service worker to be ready
                 await navigator.serviceWorker.ready;
 
-                // Initialize Firebase Messaging
+                // Initialize Firebase Messaging with the service worker
                 messaging = firebase.messaging();
+                messaging.useServiceWorker(registration);
                 
                 // Set up foreground message handler
                 messaging.onMessage((payload) => {
@@ -325,12 +323,21 @@
                     showToast(`${title}: ${body}`);
                 });
 
-                checkSubscriptionStatus();
+                await checkSubscriptionStatus();
                 loadSubscribers();
 
             } catch (error) {
                 console.error('Error initializing:', error);
                 showToast('Failed to initialize notifications: ' + error.message, 'error');
+                
+                // If service worker fails, try without it for basic functionality
+                try {
+                    messaging = firebase.messaging();
+                    await checkSubscriptionStatus();
+                    loadSubscribers();
+                } catch (fallbackError) {
+                    console.error('Fallback initialization failed:', fallbackError);
+                }
             }
         }
 
@@ -338,7 +345,7 @@
         async function checkSubscriptionStatus() {
             try {
                 const token = await messaging.getToken({
-                    vapidKey: 'BLn40Dz9ZqtheLiJ69uZgvZshU_MZpkBE9JJGa8nqvuwc54k6GTHhMNBjlSnuPcyr2up1ePNMxwCMfPvFF55ok8' // TODO: Replace with your VAPID key
+                    vapidKey: 'BLn40Dz9ZqtheLiJ69uZgvZshU_MZpkBE9JJGa8nqvuwc54k6GTHhMNBjlSnuPcyr2up1ePNMxwCMfPvFF55ok8'
                 });
                 
                 if (token) {
@@ -346,9 +353,12 @@
                     isSubscribed = true;
                     updateSubscriptionUI();
                     await saveTokenToDatabase(token);
+                } else {
+                    updateSubscriptionUI();
                 }
             } catch (error) {
                 console.log('No existing token:', error);
+                updateSubscriptionUI();
             }
         }
 
@@ -372,7 +382,7 @@
                 }
 
                 const token = await messaging.getToken({
-                    vapidKey: 'BLn40Dz9ZqtheLiJ69uZgvZshU_MZpkBE9JJGa8nqvuwc54k6GTHhMNBjlSnuPcyr2up1ePNMxwCMfPvFF55ok8' // TODO: Replace with your VAPID key
+                    vapidKey: 'BLn40Dz9ZqtheLiJ69uZgvZshU_MZpkBE9JJGa8nqvuwc54k6GTHhMNBjlSnuPcyr2up1ePNMxwCMfPvFF55ok8'
                 });
                 
                 if (token) {
@@ -517,58 +527,34 @@
                 }
                 
                 // Store notification in database
-                const notificationDoc = await db.collection('notifications').add({
+                await db.collection('notifications').add({
                     title: title,
                     message: message,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     subscriberCount: snapshot.size
                 });
                 
-                // Send to each subscriber using Web Push API directly
+                // For testing: show notification to current user
                 let successCount = 0;
-                let errorCount = 0;
-                
-                const promises = [];
-                snapshot.forEach((doc) => {
-                    const token = doc.data().token;
-                    const promise = sendToToken(token, title, message)
-                        .then(() => successCount++)
-                        .catch((error) => {
-                            console.error('Error sending to token:', error);
-                            errorCount++;
-                        });
-                    promises.push(promise);
-                });
-                
-                await Promise.all(promises);
+                if (currentToken && Notification.permission === 'granted') {
+                    new Notification(title, {
+                        body: message,
+                        icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiM2NjdlZWEiLz4KPHN2ZyB4PSIxNiIgeT0iMTYiIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CjxwYXRoIGQ9Im0zIDEyIDggOC0xMCA4LTgtOCAxMC04eiIvPgo8L3N2Zz4KPC9zdmc+',
+                        tag: 'admin-notification'
+                    });
+                    successCount = 1;
+                }
                 
                 // Clear form
                 document.getElementById('notificationTitle').value = 'Hello Message';
                 document.getElementById('notificationMessage').value = '';
                 
-                statusDiv.innerHTML = `<div class="status success">Sent to ${successCount} subscribers! (${errorCount} errors)</div>`;
+                statusDiv.innerHTML = `<div class="status success">Notification sent! (${successCount} shown locally for testing)</div>`;
                 
             } catch (error) {
                 console.error('Error sending notifications:', error);
                 statusDiv.innerHTML = '<div class="status error">Error: ' + error.message + '</div>';
             }
-        }
-
-        // Send notification to specific token (simplified version)
-        async function sendToToken(token, title, body) {
-            // For full functionality, you'd need to implement FCM server-side
-            // This is a placeholder that shows the notification locally for testing
-            if (token === currentToken) {
-                // Show notification for current user as a test
-                if (Notification.permission === 'granted') {
-                    new Notification(title, {
-                        body: body,
-                        icon: '/favicon.ico',
-                        tag: 'test-notification'
-                    });
-                }
-            }
-            return Promise.resolve();
         }
 
         // Show toast notification
